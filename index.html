@@ -435,9 +435,15 @@
                 debugPaid.innerText = sharedTotal.toFixed(0);
                 debugCost.innerText = totalConsumed.toFixed(0);
                 
-                // Progress bar shows how much of the Bill (Consumed) is Covered by Payments (Paid)
-                // No, better: Progress bar shows how much of the Payments (Paid) is allocated to Costs (Consumed)
-                const percent = sharedTotal > 0 ? (totalConsumed / sharedTotal) * 100 : 0;
+                // Progress bar shows Percentage of Cost (Consumed) covered by Payments (Paid)
+                // If Paid < Cost, bar is partial. If Paid >= Cost, bar is full.
+                let percent = 0;
+                if (totalConsumed > 0) {
+                    percent = (sharedTotal / totalConsumed) * 100;
+                } else if (sharedTotal > 0) {
+                    percent = 100; // Paid something but cost is 0 -> effectively covered
+                }
+
                 allocationBar.style.width = `${Math.min(percent, 100)}%`;
                 
                 if (Math.abs(diff) < 0.1) {
