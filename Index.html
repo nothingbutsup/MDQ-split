@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Expense Split</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        
+        .receipt-font {
+            font-family: 'Space Mono', monospace;
+        }
+
+        .paper-shadow {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 
+                        0 4px 6px -2px rgba(0, 0, 0, 0.05),
+                        0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+        }
+
+        /* Toggle Switch */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #4f46e5;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #4f46e5;
+        }
+
+        /* Remove Number Input Spinners */
+        /* Chrome, Safari, Edge, Opera */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        /* Firefox */
+        input[type=number] {
+          -moz-appearance: textfield;
+        }
+        
+        /* Disabled Input Styling */
+        input:disabled {
+            background-color: #f3f4f6;
+            color: #9ca3af;
+            border-color: #e5e7eb;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="min-h-screen py-10 px-4 flex flex-col items-center justify-start">
+
+    <!-- INPUT SECTION -->
+    <div class="w-full max-w-md mb-8 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+            <h2 class="font-bold text-gray-800 text-lg flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                Details
+            </h2>
+            
+            <!-- Split Mode Toggle -->
+            <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400" id="mode-label">Equal</span>
+                <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                    <input type="checkbox" name="toggle" id="split-mode-toggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" style="top: 0; left: 0; transition: all 0.3s;" onchange="toggleSplitMode(this.checked)"/>
+                    <label for="split-mode-toggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-6">
+            <!-- Title Input -->
+            <div class="mb-6">
+                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Event Title</label>
+                <input type="text" id="event-title-input" placeholder="e.g. Saturday BBQ" 
+                    class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder-gray-300"
+                    oninput="updateTitle(this.value)">
+            </div>
+
+            <!-- Header -->
+            <div class="grid grid-cols-12 gap-2 mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider" id="table-header">
+                <!-- Injected via JS -->
+            </div>
+
+            <!-- Users List -->
+            <div id="users-container" class="space-y-3">
+                <!-- User Rows injected via JS -->
+            </div>
+            
+            <!-- Unequal Mode Warning / Tools -->
+            <div id="unequal-tools" class="hidden mt-6 p-5 bg-yellow-50 rounded-xl border border-yellow-100 shadow-sm">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-bold text-yellow-800 uppercase tracking-wide">Allocation Status</span>
+                    <span id="allocation-diff" class="font-mono text-sm font-bold text-yellow-700">$0.00 left</span>
+                </div>
+                <div class="w-full bg-yellow-200 rounded-full h-3 mb-1">
+                    <div id="allocation-bar" class="bg-yellow-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-dashed border-gray-200 flex justify-between items-center">
+                <span class="font-bold text-gray-500 text-sm">TOTAL SPENT</span>
+                <span id="total-spent-display" class="font-mono text-xl font-bold text-gray-800">$0.00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTLEMENTS RESULTS -->
+    <div id="split-card" class="w-full max-w-md bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden relative">
+        <div class="bg-white px-6 py-5 border-b border-gray-100 flex justify-between items-center">
+            <h2 id="settlement-title" class="font-bold text-gray-800 text-lg">Settlements</h2>
+            <span id="payment-count-badge" class="bg-blue-100 text-blue-700 font-bold text-xs px-3 py-1 rounded-full uppercase tracking-wide">0 Payments</span>
+        </div>
+        
+        <div class="p-6 bg-gray-50">
+            <!-- Grid of Payment Cards -->
+            <div id="settlements-container" class="grid grid-cols-1 gap-3 empty:hidden">
+                <!-- Settlements injected here -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="text-center py-8 text-gray-400 text-sm">
+                <p>Enter amounts above to generate a split.</p>
+            </div>
+            
+            <!-- Error State for Unequal Split -->
+            <div id="error-state" class="hidden text-center py-8 text-red-400 text-sm bg-red-50 rounded-lg border border-red-100">
+                <p class="font-bold">Amounts don't match!</p>
+                <p class="text-xs mt-1">Total Consumed must equal Total Paid.</p>
+            </div>
+
+            <!-- Per Person Summary Box -->
+            <div id="summary-box" class="mt-5 bg-gray-900 rounded-xl p-4 flex justify-between items-center shadow-lg border border-gray-800 hidden transition-all">
+                <div class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span class="text-gray-300 font-medium text-sm">Per person (Average)</span>
+                </div>
+                <span id="per-person-display" class="text-white font-bold font-mono text-lg tracking-tight">$0.00</span>
+            </div>
+            
+            <!-- Date footer for the image -->
+            <div class="mt-4 text-center">
+                <span class="text-[10px] text-gray-400 uppercase tracking-widest" id="current-date"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const USERS = [
+            { id: 'mate', name: 'Mate', colorBg: 'bg-blue-100', colorText: 'text-blue-600' },
+            { id: 'joako', name: 'Joako', colorBg: 'bg-orange-100', colorText: 'text-orange-600' },
+            { id: 'luqui', name: 'Luqui', colorBg: 'bg-green-100', colorText: 'text-green-600' },
+            { id: 'agus', name: 'Agus', colorBg: 'bg-pink-100', colorText: 'text-pink-600' },
+            { id: 'mastro', name: 'Mastro', colorBg: 'bg-yellow-100', colorText: 'text-yellow-600' },
+            { id: 'roman', name: 'Roman', colorBg: 'bg-purple-100', colorText: 'text-purple-600' }
+        ];
+
+        // --- STATE ---
+        let state = {
+            mode: 'EQUAL', // 'EQUAL' or 'UNEQUAL'
+            amounts: {}, // Paid amounts
+            splitting: {}, // Checkboxes for Equal/Unequal enabled state
+            shares: {}, // Custom consumed amounts for Unequal mode
+        };
+
+        // Initialize State
+        USERS.forEach(u => {
+            state.amounts[u.id] = 0;
+            state.splitting[u.id] = true;
+            state.shares[u.id] = 0;
+        });
+
+        // --- DOM ELEMENTS ---
+        const container = document.getElementById('users-container');
+        const headerContainer = document.getElementById('table-header');
+        const settlementsContainer = document.getElementById('settlements-container');
+        const totalDisplay = document.getElementById('total-spent-display');
+        const perPersonDisplay = document.getElementById('per-person-display');
+        const summaryBox = document.getElementById('summary-box');
+        const emptyState = document.getElementById('empty-state');
+        const errorState = document.getElementById('error-state');
+        const paymentCountBadge = document.getElementById('payment-count-badge');
+        const dateElement = document.getElementById('current-date');
+        const unequalTools = document.getElementById('unequal-tools');
+        const allocationDiff = document.getElementById('allocation-diff');
+        const allocationBar = document.getElementById('allocation-bar');
+        const modeLabel = document.getElementById('mode-label');
+
+        // Set Date
+        dateElement.innerText = new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        // --- RENDERERS ---
+
+        function renderInputs() {
+            container.innerHTML = '';
+            
+            // 1. Update Labels
+            modeLabel.innerText = state.mode === 'EQUAL' ? 'Equal' : 'Unequal';
+            modeLabel.className = `text-[10px] font-bold uppercase tracking-wider ${state.mode === 'EQUAL' ? 'text-gray-400' : 'text-indigo-600'}`;
+            
+            // 2. Update Header Layout based on Mode
+            if (state.mode === 'EQUAL') {
+                headerContainer.innerHTML = `
+                    <div class="col-span-5 pl-1">Name</div>
+                    <div class="col-span-4 text-right pr-2">Paid ($)</div>
+                    <div class="col-span-3 text-center">Split?</div>
+                `;
+            } else {
+                // Dutch Mode: Name | Consumed | Paid | Enabled?
+                headerContainer.innerHTML = `
+                    <div class="col-span-4 pl-1">Name</div>
+                    <div class="col-span-3 text-right">Consumed</div>
+                    <div class="col-span-3 text-right">Paid</div>
+                    <div class="col-span-2 text-center">Incl?</div>
+                `;
+            }
+
+            // 3. Show/Hide Unequal Tools
+            if (state.mode === 'UNEQUAL') {
+                unequalTools.classList.remove('hidden');
+            } else {
+                unequalTools.classList.add('hidden');
+            }
+
+            // 4. Render Rows
+            USERS.forEach(user => {
+                const row = document.createElement('div');
+                row.className = 'grid grid-cols-12 gap-2 items-center group';
+                
+                const isEnabled = state.splitting[user.id];
+
+                // Name Component
+                const nameHtml = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full ${user.colorBg} flex items-center justify-center ${user.colorText} shrink-0">
+                            <span class="text-xs font-bold">${user.name.substring(0,2).toUpperCase()}</span>
+                        </div>
+                        <span class="text-sm font-medium ${isEnabled ? 'text-gray-700' : 'text-gray-400'} truncate transition-colors">${user.name}</span>
+                    </div>
+                `;
+
+                // Split Checkbox Component (Used in both modes now)
+                const checkboxHtml = `
+                    <div class="flex justify-center">
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" class="sr-only peer" 
+                                onchange="updateSplit('${user.id}', this.checked)"
+                                ${isEnabled ? 'checked' : ''}>
+                            <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
+                    </div>
+                `;
+
+                if (state.mode === 'EQUAL') {
+                    // EQUAL MODE LAYOUT: Name (5) | Paid (4) | Split Check (3)
+                    const paidInputHtml = `
+                        <div class="relative">
+                            <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                            <input type="number" min="0" step="100" placeholder="0" 
+                                class="w-full pl-5 pr-2 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-gray-800 placeholder-gray-300"
+                                oninput="updateAmount('${user.id}', this.value)"
+                                value="${state.amounts[user.id] > 0 ? state.amounts[user.id] : ''}"
+                            >
+                        </div>
+                    `;
+
+                    row.innerHTML = `
+                        <div class="col-span-5">${nameHtml}</div>
+                        <div class="col-span-4">${paidInputHtml}</div>
+                        <div class="col-span-3">${checkboxHtml}</div>
+                    `;
+
+                } else {
+                    // UNEQUAL (DUTCH) MODE LAYOUT: Name (4) | Consumed (3) | Paid (3) | Check (2)
+                    
+                    const consumedInputHtml = `
+                         <div class="relative">
+                            <span class="absolute left-1 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">$</span>
+                            <input type="number" min="0" step="1" placeholder="0" 
+                                ${!isEnabled ? 'disabled' : ''}
+                                class="w-full pl-3 pr-1 py-1.5 bg-indigo-50 border border-indigo-100 rounded-md text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-gray-800 placeholder-indigo-200 disabled:opacity-50"
+                                oninput="updateShare('${user.id}', this.value)"
+                                value="${state.shares[user.id] > 0 ? state.shares[user.id] : ''}"
+                            >
+                        </div>
+                    `;
+
+                    const paidInputHtmlTight = `
+                        <div class="relative">
+                            <input type="number" min="0" step="100" placeholder="0" 
+                                ${!isEnabled ? 'disabled' : ''}
+                                class="w-full pl-1 pr-1 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-gray-800 placeholder-gray-300 disabled:opacity-50"
+                                oninput="updateAmount('${user.id}', this.value)"
+                                value="${state.amounts[user.id] > 0 ? state.amounts[user.id] : ''}"
+                            >
+                        </div>
+                    `;
+
+                    row.innerHTML = `
+                        <div class="col-span-4">${nameHtml}</div>
+                        <div class="col-span-3">${consumedInputHtml}</div>
+                        <div class="col-span-3">${paidInputHtmlTight}</div>
+                        <div class="col-span-2">${checkboxHtml}</div>
+                    `;
+                }
+
+                container.appendChild(row);
+            });
+        }
+
+        // --- LOGIC HANDLERS ---
+        window.toggleSplitMode = (isUnequal) => {
+            state.mode = isUnequal ? 'UNEQUAL' : 'EQUAL';
+            
+            // CLEAR BOXES logic: Reset all values when switching
+            USERS.forEach(u => {
+                state.amounts[u.id] = 0;
+                state.shares[u.id] = 0;
+                // Optionally reset enabled state, but user didn't ask explicitly. 
+                // Keeping selection state is usually better UX, but we can reset if needed.
+                // state.splitting[u.id] = true; 
+            });
+
+            renderInputs();
+            calculate();
+        };
+
+        window.updateTitle = (val) => {
+            const titleEl = document.getElementById('settlement-title');
+            titleEl.innerText = (val && val.trim() !== '') ? val : 'Settlements';
+        };
+
+        window.updateAmount = (id, val) => {
+            state.amounts[id] = parseFloat(val) || 0;
+            calculate(); 
+        };
+
+        window.updateSplit = (id, isChecked) => {
+            state.splitting[id] = isChecked;
+            
+            // If disabling in Dutch mode, clear their values so math balances
+            if (state.mode === 'UNEQUAL' && !isChecked) {
+                state.amounts[id] = 0;
+                state.shares[id] = 0;
+            }
+            
+            renderInputs(); // Always re-render to update the disabled state in UI
+            calculate();
+        };
+
+        window.updateShare = (id, val) => {
+            state.shares[id] = parseFloat(val) || 0;
+            calculate();
+        };
+
+        function formatMoney(amount) {
+            return '$' + amount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function calculate() {
+            // 1. Calculate Totals (Only sum enabled users or just all amounts since disabled are 0)
+            const sharedTotal = Object.values(state.amounts).reduce((a, b) => a + b, 0);
+            const grandTotal = sharedTotal; // No direct expenses anymore
+
+            // Update Total UI
+            totalDisplay.innerText = formatMoney(grandTotal);
+
+            // 2. Determine Consumption Logic based on Mode
+            let consumption = {}; // How much each person 'Consumed' from the shared pot
+            let isValid = true;
+
+            if (state.mode === 'EQUAL') {
+                const splitters = USERS.filter(u => state.splitting[u.id]);
+                const splitCount = splitters.length;
+                const fairShare = splitCount > 0 ? sharedTotal / splitCount : 0;
+                
+                USERS.forEach(u => {
+                    consumption[u.id] = state.splitting[u.id] ? fairShare : 0;
+                });
+                
+                // UI: Update Summary Box (SHOW in Equal Mode)
+                if (sharedTotal > 0 && splitCount > 0) {
+                    perPersonDisplay.innerText = formatMoney(fairShare);
+                    summaryBox.classList.remove('hidden');
+                } else {
+                    summaryBox.classList.add('hidden');
+                }
+
+            } else {
+                // UNEQUAL MODE
+                summaryBox.classList.add('hidden'); // Hide summary
+
+                const totalConsumed = Object.values(state.shares).reduce((a, b) => a + b, 0);
+                const diff = sharedTotal - totalConsumed;
+
+                USERS.forEach(u => {
+                    // If disabled, consumption is 0 regardless of residual value (though input prevents it)
+                    consumption[u.id] = state.splitting[u.id] ? (state.shares[u.id] || 0) : 0;
+                });
+
+                // Validation UI
+                const progress = sharedTotal > 0 ? (totalConsumed / sharedTotal) * 100 : 0;
+                allocationBar.style.width = `${Math.min(progress, 100)}%`;
+                
+                if (Math.abs(diff) < 0.1) {
+                    allocationDiff.innerText = "Balanced";
+                    allocationDiff.className = "font-mono text-sm font-bold text-green-600";
+                    allocationBar.className = "bg-green-500 h-3 rounded-full transition-all duration-300";
+                } else if (diff > 0) {
+                    allocationDiff.innerText = `${formatMoney(diff)} left`;
+                    allocationDiff.className = "font-mono text-sm font-bold text-yellow-600";
+                    allocationBar.className = "bg-yellow-500 h-3 rounded-full transition-all duration-300";
+                    isValid = false;
+                } else {
+                    allocationDiff.innerText = `${formatMoney(Math.abs(diff))} over`;
+                    allocationDiff.className = "font-mono text-sm font-bold text-red-600";
+                    allocationBar.className = "bg-red-500 h-3 rounded-full transition-all duration-300";
+                    isValid = false;
+                }
+            }
+
+            // 3. Clear Previous Results if Invalid
+            if (!isValid && state.mode === 'UNEQUAL') {
+                settlementsContainer.innerHTML = '';
+                paymentCountBadge.innerText = 'Error';
+                emptyState.style.display = 'none';
+                errorState.style.display = 'block';
+                errorState.classList.remove('hidden');
+                return;
+            } else {
+                errorState.style.display = 'none';
+                errorState.classList.add('hidden');
+            }
+
+            if (grandTotal === 0) {
+                renderSettlements([], 0);
+                summaryBox.classList.add('hidden');
+                return;
+            }
+
+            // 4. Calculate Net Balances
+            // Balance logic: Positive = Owed TO me. Negative = I OWE others.
+            let balancesMap = {}; 
+            USERS.forEach(u => balancesMap[u.id] = 0);
+
+            // Apply Shared Pot
+            USERS.forEach(u => {
+                const paid = state.amounts[u.id];
+                const consumed = consumption[u.id];
+                balancesMap[u.id] += (paid - consumed);
+            });
+
+            // 5. Generate Settlement List
+            let balances = USERS.map(u => ({
+                id: u.id,
+                name: u.name,
+                colorBg: u.colorBg,
+                colorText: u.colorText,
+                balance: balancesMap[u.id]
+            })).filter(u => Math.abs(u.balance) > 0.01);
+
+            let debtors = balances.filter(b => b.balance < 0).sort((a,b) => a.balance - b.balance);
+            let creditors = balances.filter(b => b.balance > 0).sort((a,b) => b.balance - a.balance);
+
+            let settlements = [];
+            let i = 0; 
+            let j = 0; 
+
+            while (i < debtors.length && j < creditors.length) {
+                let debtor = debtors[i];
+                let creditor = creditors[j];
+
+                let amount = Math.min(Math.abs(debtor.balance), creditor.balance);
+                amount = Math.round(amount * 100) / 100;
+
+                if (amount > 0) {
+                    settlements.push({
+                        from: debtor,
+                        to: creditor,
+                        amount: amount
+                    });
+                }
+
+                debtor.balance += amount;
+                creditor.balance -= amount;
+
+                if (Math.abs(debtor.balance) < 0.01) i++;
+                if (Math.abs(creditor.balance) < 0.01) j++;
+            }
+
+            renderSettlements(settlements, settlements.length);
+        }
+
+        function renderSettlements(settlements, count) {
+            settlementsContainer.innerHTML = '';
+            paymentCountBadge.innerText = `${count} Payment${count !== 1 ? 's' : ''}`;
+
+            if (count === 0) {
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+
+            settlements.forEach(s => {
+                const card = document.createElement('div');
+                card.className = 'flex items-center justify-between bg-white p-3 rounded-xl border border-gray-200 shadow-sm transition-transform hover:scale-[1.02]';
+                
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="relative">
+                            <div class="w-10 h-10 rounded-full ${s.from.colorBg} flex items-center justify-center ${s.from.colorText}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                            </div>
+                            <!-- Arrow Badge -->
+                            <div class="absolute -right-1 -bottom-1 bg-white rounded-full p-0.5 border border-gray-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-800">
+                                <span class="font-bold">${s.from.name}</span> pays <span class="font-bold">${s.to.name}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono font-bold text-gray-800">${formatMoney(s.amount)}</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                `;
+                settlementsContainer.appendChild(card);
+            });
+        }
+
+        // Start
+        renderInputs();
+        calculate();
+    </script>
+</body>
+</html>
