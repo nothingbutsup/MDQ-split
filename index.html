@@ -20,12 +20,6 @@
             font-family: 'Space Mono', monospace;
         }
 
-        .paper-shadow {
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 
-                        0 4px 6px -2px rgba(0, 0, 0, 0.05),
-                        0 20px 25px -5px rgba(0, 0, 0, 0.1);
-        }
-
         /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 6px;
@@ -41,14 +35,6 @@
             background: #94a3b8; 
         }
         
-        select {
-            appearance: none;
-            background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
-            background-position: right 0.5rem center;
-            background-repeat: no-repeat;
-            background-size: 1.5em 1.5em;
-        }
-
         /* Toggle Switch */
         .toggle-checkbox:checked {
             right: 0;
@@ -59,13 +45,11 @@
         }
 
         /* Remove Number Input Spinners */
-        /* Chrome, Safari, Edge, Opera */
         input::-webkit-outer-spin-button,
         input::-webkit-inner-spin-button {
           -webkit-appearance: none;
           margin: 0;
         }
-        /* Firefox */
         input[type=number] {
           -moz-appearance: textfield;
         }
@@ -76,6 +60,7 @@
             color: #9ca3af;
             border-color: #e5e7eb;
             cursor: not-allowed;
+            opacity: 0.6;
         }
     </style>
 </head>
@@ -124,13 +109,17 @@
                     <span class="text-xs font-bold text-yellow-800 uppercase tracking-wide">Allocation Status</span>
                     <span id="allocation-diff" class="font-mono text-sm font-bold text-yellow-700">$0.00 left</span>
                 </div>
-                <div class="w-full bg-yellow-200 rounded-full h-3 mb-1">
+                <div class="w-full bg-gray-200 rounded-full h-3 mb-1 overflow-hidden">
                     <div id="allocation-bar" class="bg-yellow-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-yellow-600 mt-1">
+                    <span>Paid: <span id="debug-paid" class="font-mono">0</span></span>
+                    <span>Cost: <span id="debug-cost" class="font-mono">0</span></span>
                 </div>
             </div>
 
             <div class="mt-6 pt-4 border-t border-dashed border-gray-200 flex justify-between items-center">
-                <span class="font-bold text-gray-500 text-sm">TOTAL SPENT</span>
+                <span class="font-bold text-gray-500 text-sm" id="total-label">TOTAL SPENT</span>
                 <span id="total-spent-display" class="font-mono text-xl font-bold text-gray-800">$0.00</span>
             </div>
         </div>
@@ -156,20 +145,20 @@
             
             <!-- Error State for Unequal Split -->
             <div id="error-state" class="hidden text-center py-8 text-red-400 text-sm bg-red-50 rounded-lg border border-red-100">
-                <p class="font-bold">Amounts don't match!</p>
-                <p class="text-xs mt-1">Total Consumed must equal Total Paid.</p>
+                <p class="font-bold text-red-600">Amounts don't match!</p>
+                <p class="text-xs mt-1 text-red-500">Total Consumed must equal Total Paid.</p>
             </div>
 
             <!-- Per Person Summary Box -->
             <div id="summary-box" class="mt-5 bg-gray-900 rounded-xl p-4 flex justify-between items-center shadow-lg border border-gray-800 hidden transition-all">
                 <div class="flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    <span class="text-gray-300 font-medium text-sm">Per person</span>
+                    <span class="text-gray-300 font-medium text-sm">Per person (Average)</span>
                 </div>
                 <span id="per-person-display" class="text-white font-bold font-mono text-lg tracking-tight">$0.00</span>
             </div>
             
-            <!-- Date footer for the image -->
+            <!-- Date footer -->
             <div class="mt-4 text-center">
                 <span class="text-[10px] text-gray-400 uppercase tracking-widest" id="current-date"></span>
             </div>
@@ -190,9 +179,9 @@
         // --- STATE ---
         let state = {
             mode: 'EQUAL', // 'EQUAL' or 'UNEQUAL'
-            amounts: {}, // Paid amounts
-            splitting: {}, // Checkboxes for Equal/Unequal enabled state
-            shares: {}, // Custom consumed amounts for Unequal mode
+            amounts: {}, // Paid amounts (Money In)
+            splitting: {}, // Checkboxes
+            shares: {}, // Consumed amounts (Money Out)
         };
 
         // Initialize State
@@ -207,6 +196,7 @@
         const headerContainer = document.getElementById('table-header');
         const settlementsContainer = document.getElementById('settlements-container');
         const totalDisplay = document.getElementById('total-spent-display');
+        const totalLabel = document.getElementById('total-label');
         const perPersonDisplay = document.getElementById('per-person-display');
         const summaryBox = document.getElementById('summary-box');
         const emptyState = document.getElementById('empty-state');
@@ -217,6 +207,8 @@
         const allocationDiff = document.getElementById('allocation-diff');
         const allocationBar = document.getElementById('allocation-bar');
         const modeLabel = document.getElementById('mode-label');
+        const debugPaid = document.getElementById('debug-paid');
+        const debugCost = document.getElementById('debug-cost');
 
         // Set Date
         dateElement.innerText = new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -232,17 +224,19 @@
             
             // 2. Update Header Layout based on Mode
             if (state.mode === 'EQUAL') {
+                totalLabel.innerText = "TOTAL SPENT";
                 headerContainer.innerHTML = `
                     <div class="col-span-5 pl-1">Name</div>
                     <div class="col-span-4 text-right pr-2">Paid ($)</div>
                     <div class="col-span-3 text-center">Split?</div>
                 `;
             } else {
-                // Dutch Mode: Name | Consumed | Paid | Enabled?
+                totalLabel.innerText = "TOTAL BILL";
+                // Dutch Mode: Name | Consumed | Paid | Incl?
                 headerContainer.innerHTML = `
                     <div class="col-span-4 pl-1">Name</div>
-                    <div class="col-span-3 text-right">Consumed</div>
-                    <div class="col-span-3 text-right">Paid</div>
+                    <div class="col-span-3 text-right text-indigo-600">Consumed</div>
+                    <div class="col-span-3 text-right text-gray-500">Paid</div>
                     <div class="col-span-2 text-center">Incl?</div>
                 `;
             }
@@ -271,7 +265,7 @@
                     </div>
                 `;
 
-                // Split Checkbox Component (Used in both modes now)
+                // Split Checkbox Component
                 const checkboxHtml = `
                     <div class="flex justify-center">
                         <label class="relative inline-flex items-center cursor-pointer">
@@ -283,15 +277,18 @@
                     </div>
                 `;
 
+                // Paid Input (Used in both, but styled differently in Unequal)
+                const paidValue = state.amounts[user.id] > 0 ? state.amounts[user.id] : '';
+                
                 if (state.mode === 'EQUAL') {
-                    // EQUAL MODE LAYOUT: Name (5) | Paid (4) | Split Check (3)
+                    // EQUAL MODE
                     const paidInputHtml = `
                         <div class="relative">
                             <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
                             <input type="number" min="0" step="100" placeholder="0" 
                                 class="w-full pl-5 pr-2 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-gray-800 placeholder-gray-300"
                                 oninput="updateAmount('${user.id}', this.value)"
-                                value="${state.amounts[user.id] > 0 ? state.amounts[user.id] : ''}"
+                                value="${paidValue}"
                             >
                         </div>
                     `;
@@ -303,27 +300,30 @@
                     `;
 
                 } else {
-                    // UNEQUAL (DUTCH) MODE LAYOUT: Name (4) | Consumed (3) | Paid (3) | Check (2)
+                    // UNEQUAL (DUTCH) MODE
                     
+                    // Paid Input (Column 3) - Standard look
+                    const paidInputHtmlTight = `
+                        <div class="relative">
+                             <input type="number" min="0" step="100" placeholder="0" 
+                                ${!isEnabled ? 'disabled' : ''}
+                                class="w-full pl-1 pr-1 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-gray-800 placeholder-gray-300 disabled:opacity-50"
+                                oninput="updateAmount('${user.id}', this.value)"
+                                value="${paidValue}"
+                            >
+                        </div>
+                    `;
+                    
+                    // Consumed Input (Column 2) - Highlighted look
+                    const consumedValue = state.shares[user.id] > 0 ? state.shares[user.id] : '';
                     const consumedInputHtml = `
                          <div class="relative">
-                            <span class="absolute left-1 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">$</span>
+                            <span class="absolute left-1 top-1/2 -translate-y-1/2 text-indigo-400 text-[10px]">$</span>
                             <input type="number" min="0" step="1" placeholder="0" 
                                 ${!isEnabled ? 'disabled' : ''}
                                 class="w-full pl-3 pr-1 py-1.5 bg-indigo-50 border border-indigo-100 rounded-md text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-gray-800 placeholder-indigo-200 disabled:opacity-50"
                                 oninput="updateShare('${user.id}', this.value)"
-                                value="${state.shares[user.id] > 0 ? state.shares[user.id] : ''}"
-                            >
-                        </div>
-                    `;
-
-                    const paidInputHtmlTight = `
-                        <div class="relative">
-                            <input type="number" min="0" step="100" placeholder="0" 
-                                ${!isEnabled ? 'disabled' : ''}
-                                class="w-full pl-1 pr-1 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-gray-800 placeholder-gray-300 disabled:opacity-50"
-                                oninput="updateAmount('${user.id}', this.value)"
-                                value="${state.amounts[user.id] > 0 ? state.amounts[user.id] : ''}"
+                                value="${consumedValue}"
                             >
                         </div>
                     `;
@@ -344,13 +344,10 @@
         window.toggleSplitMode = (isUnequal) => {
             state.mode = isUnequal ? 'UNEQUAL' : 'EQUAL';
             
-            // CLEAR BOXES logic: Reset all values when switching
+            // CLEAR VALUES on mode switch to prevent confusion
             USERS.forEach(u => {
                 state.amounts[u.id] = 0;
                 state.shares[u.id] = 0;
-                // Optionally reset enabled state, but user didn't ask explicitly. 
-                // Keeping selection state is usually better UX, but we can reset if needed.
-                // state.splitting[u.id] = true; 
             });
 
             renderInputs();
@@ -370,13 +367,12 @@
         window.updateSplit = (id, isChecked) => {
             state.splitting[id] = isChecked;
             
-            // If disabling in Dutch mode, clear their values so math balances
             if (state.mode === 'UNEQUAL' && !isChecked) {
                 state.amounts[id] = 0;
                 state.shares[id] = 0;
             }
-            
-            renderInputs(); // Always re-render to update the disabled state in UI
+
+            renderInputs(); 
             calculate();
         };
 
@@ -390,18 +386,16 @@
         }
 
         function calculate() {
-            // 1. Calculate Totals (Only sum enabled users or just all amounts since disabled are 0)
-            const sharedTotal = Object.values(state.amounts).reduce((a, b) => a + b, 0);
-            const grandTotal = sharedTotal; // No direct expenses anymore
-
-            // Update Total UI
-            totalDisplay.innerText = formatMoney(grandTotal);
-
-            // 2. Determine Consumption Logic based on Mode
-            let consumption = {}; // How much each person 'Consumed' from the shared pot
+            // 1. Calculate Totals
+            const sharedTotal = Object.values(state.amounts).reduce((a, b) => a + b, 0); // Total Paid
+            
+            let consumption = {}; 
             let isValid = true;
+            let totalConsumed = 0;
 
             if (state.mode === 'EQUAL') {
+                totalDisplay.innerText = formatMoney(sharedTotal); // Show Total Paid
+                
                 const splitters = USERS.filter(u => state.splitting[u.id]);
                 const splitCount = splitters.length;
                 const fairShare = splitCount > 0 ? sharedTotal / splitCount : 0;
@@ -410,7 +404,6 @@
                     consumption[u.id] = state.splitting[u.id] ? fairShare : 0;
                 });
                 
-                // UI: Update Summary Box (SHOW in Equal Mode)
                 if (sharedTotal > 0 && splitCount > 0) {
                     perPersonDisplay.innerText = formatMoney(fairShare);
                     summaryBox.classList.remove('hidden');
@@ -420,31 +413,46 @@
 
             } else {
                 // UNEQUAL MODE
-                summaryBox.classList.add('hidden'); // Hide summary
+                summaryBox.classList.add('hidden'); 
 
-                const totalConsumed = Object.values(state.shares).reduce((a, b) => a + b, 0);
-                const diff = sharedTotal - totalConsumed;
+                // Calculate Total Consumed
+                totalConsumed = USERS.reduce((sum, u) => {
+                    return sum + (state.splitting[u.id] ? (state.shares[u.id] || 0) : 0);
+                }, 0);
+
+                // Show Total CONSUMED (Bill Size) in Unequal Mode
+                totalDisplay.innerText = formatMoney(totalConsumed);
 
                 USERS.forEach(u => {
-                    // If disabled, consumption is 0 regardless of residual value (though input prevents it)
                     consumption[u.id] = state.splitting[u.id] ? (state.shares[u.id] || 0) : 0;
                 });
 
                 // Validation UI
-                const progress = sharedTotal > 0 ? (totalConsumed / sharedTotal) * 100 : 0;
-                allocationBar.style.width = `${Math.min(progress, 100)}%`;
+                // sharedTotal = Money In (Paid)
+                // totalConsumed = Money Out (Cost)
+                const diff = sharedTotal - totalConsumed;
+                
+                debugPaid.innerText = sharedTotal.toFixed(0);
+                debugCost.innerText = totalConsumed.toFixed(0);
+                
+                // Progress bar shows how much of the Bill (Consumed) is Covered by Payments (Paid)
+                // No, better: Progress bar shows how much of the Payments (Paid) is allocated to Costs (Consumed)
+                const percent = sharedTotal > 0 ? (totalConsumed / sharedTotal) * 100 : 0;
+                allocationBar.style.width = `${Math.min(percent, 100)}%`;
                 
                 if (Math.abs(diff) < 0.1) {
                     allocationDiff.innerText = "Balanced";
                     allocationDiff.className = "font-mono text-sm font-bold text-green-600";
                     allocationBar.className = "bg-green-500 h-3 rounded-full transition-all duration-300";
                 } else if (diff > 0) {
-                    allocationDiff.innerText = `${formatMoney(diff)} left`;
+                    // Paid > Consumed = Money LEFT UNALLOCATED
+                    allocationDiff.innerText = `${formatMoney(diff)} over`;
                     allocationDiff.className = "font-mono text-sm font-bold text-yellow-600";
                     allocationBar.className = "bg-yellow-500 h-3 rounded-full transition-all duration-300";
                     isValid = false;
                 } else {
-                    allocationDiff.innerText = `${formatMoney(Math.abs(diff))} over`;
+                    // Paid < Consumed = SHORT / MISSING money
+                    allocationDiff.innerText = `Missing ${formatMoney(Math.abs(diff))}`;
                     allocationDiff.className = "font-mono text-sm font-bold text-red-600";
                     allocationBar.className = "bg-red-500 h-3 rounded-full transition-all duration-300";
                     isValid = false;
@@ -464,18 +472,19 @@
                 errorState.classList.add('hidden');
             }
 
-            if (grandTotal === 0) {
+            if (state.mode === 'EQUAL' && sharedTotal === 0) {
                 renderSettlements([], 0);
-                summaryBox.classList.add('hidden');
+                return;
+            }
+             if (state.mode === 'UNEQUAL' && totalConsumed === 0) {
+                renderSettlements([], 0);
                 return;
             }
 
             // 4. Calculate Net Balances
-            // Balance logic: Positive = Owed TO me. Negative = I OWE others.
             let balancesMap = {}; 
             USERS.forEach(u => balancesMap[u.id] = 0);
 
-            // Apply Shared Pot
             USERS.forEach(u => {
                 const paid = state.amounts[u.id];
                 const consumed = consumption[u.id];
@@ -544,7 +553,6 @@
                             <div class="w-10 h-10 rounded-full ${s.from.colorBg} flex items-center justify-center ${s.from.colorText}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                             </div>
-                            <!-- Arrow Badge -->
                             <div class="absolute -right-1 -bottom-1 bg-white rounded-full p-0.5 border border-gray-100">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                             </div>
@@ -570,4 +578,3 @@
     </script>
 </body>
 </html>
-
